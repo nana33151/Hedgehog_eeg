@@ -24,7 +24,7 @@ from braindecode.preprocessing import (
     preprocess,
 )
 
-TGT_VOCAB_SIZE = 4
+TGT_VOCAB_SIZE = 5
 DIM=64
 NUM_HEADS=4
 NUM_LAYERS=4
@@ -118,11 +118,14 @@ class Transformer(nn.Module):
 
 
 def labels_to_matrices(labels, tgt_vocab_size, seq_len):
-    labels_matrices = torch.zeros(seq_len, tgt_vocab_size).cuda()
+    class_matrices = torch.zeros(seq_len, tgt_vocab_size-1).cuda()
+    last_class = torch.ones(seq_len, 1).cuda()
+    labels_matrices = torch.cat([class_matrices, last_class],1).cuda()
     coordinates = list(labels.keys())
-    windows = []
+
     for i in coordinates:
         labels_matrices[i][labels[i]-1] = 1.0
+        labels_matrices[i][tgt_vocab_size-1] = 0.0
     labels_matrices = labels_matrices.type(torch.FloatTensor).cuda()
     return(labels_matrices)
 
