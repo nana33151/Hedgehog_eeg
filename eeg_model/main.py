@@ -207,7 +207,7 @@ for i in range(len(training_datasets)):
     labels_batches += torch.split(labels_matrices, SEQ_LEN)
     test_datasets += slice_to_batches(traw_data, SEQ_LEN, n_batches, N_CHANNELS)
 
-
+print(len(training_datasets))
 transformer = Transformer(DIM,NUM_HEADS,NUM_LAYERS,FF_DIM,SEQ_LEN,DROPOUT,N_CHANNELS,TGT_VOCAB_SIZE)#d_model, num_heads, num_layers, d_ff, seq_lenght, dropout,in_d,tgt_vocab_size
 transformer = transformer.to(device)
 #torch.save(transformer, "model.onnx")
@@ -226,10 +226,16 @@ for j in range(EPOCHS):
         running_corr += corr
         if loss < best_loss:
             best_loss = loss
-            os.remove("model.onnx")
+            print("try to upfate model.onnx")
+            try:
+                os.remove(a)
+            except OSError as e: # name the Exception `e`
+                print ("Failed with:", e.strerror) # look what it says
+                print ("Error code:", e.code )
             torch.save(transformer, "model.onnx")
         if i % 10 == 9:
             last_loss = running_loss / 10 
+            print("training step")
             print(f"batch {i+1} loss: {last_loss} correct {running_corr/10000}")
             running_loss = 0
             running_corr = 0
@@ -245,6 +251,7 @@ for i in range(len(validating_datasets)):
     valid_corr += corr
     if i % 10 == 9:
         last_loss = running_loss / 10 
+        print("valid step")
         print(f"batch {i+1} loss: {valid_loss} correct {valid_corr/10000}")
         valid_loss = 0
         valid_corr = 0
