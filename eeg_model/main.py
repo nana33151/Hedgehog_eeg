@@ -165,17 +165,26 @@ def preprocessing(dataset):
 
     return dataset
 
-first_datasets = MOABBDataset(dataset_name="BNCI2014_001", subject_ids=[1,2,3,4,5,6,7,8,9])
-datasets = preprocessing(first_datasets)
-print(len(datasets.datasets))
+one_train_set = 4
+
+training_set = []
+target_set = []
+validating_set = []
+for id in range(1,10):
+    raw_dataset = MOABBDataset(dataset_name="BNCI2014_001", subject_ids=[id])
+    preprocessed_dataset = preprocessing(raw_dataset)
+    training_set += preprocessed_dataset.datasets[0:4]
+    target_set += preprocessed_dataset.datasets[4:8]
+    validating_set += preprocessed_dataset.datasets[8:12]
+
 training_datasets = []
 test_datasets = []
 labels_batches = []
 validating_datasets = []
 pred_batches = []
 
-for i in range(len(valid_datasets.datasets)):
-    valid_raw = valid_datasets.datasets[i].raw
+for i in range(len(validating_set)):
+    valid_raw = validating_set[i].raw
     raw_data = torch.from_numpy(valid_raw.get_data()).cuda()
     n_batches = raw_data.size(1)//SEQ_LEN
     validating_datasets += slice_to_batches(raw_data, SEQ_LEN, n_batches, N_CHANNELS)
@@ -187,13 +196,12 @@ for i in range(len(valid_datasets.datasets)):
     pred_batches += torch.split(pred_matrices, SEQ_LEN)
 
 
-
-for i in range(len(train_datasets.datasets)):
-    train_raw = train_datasets.datasets[i].raw
+for i in range(len(training_datasets)):
+    train_raw = training_set[i].raw
     raw_data = torch.from_numpy(train_raw.get_data()).cuda()
     n_batches = raw_data.size(1)//SEQ_LEN
     training_datasets += slice_to_batches(raw_data, SEQ_LEN, n_batches, N_CHANNELS)
-    test_raw = target_datasets.datasets[i].raw
+    test_raw = target_set[i].raw
     traw_data = torch.from_numpy(test_raw.get_data()).cuda()
     labels = torch.from_numpy(mne.events_from_annotations(test_raw)[0]).cuda()
     labels_dict = {}
@@ -203,7 +211,6 @@ for i in range(len(train_datasets.datasets)):
     labels_batches += torch.split(labels_matrices, SEQ_LEN)
     
     test_datasets += slice_to_batches(traw_data, SEQ_LEN, n_batches, N_CHANNELS)
-
 
 
 transformer = Transformer(DIM,NUM_HEADS,NUM_LAYERS,FF_DIM,SEQ_LEN,DROPOUT,N_CHANNELS,TGT_VOCAB_SIZE)#d_model, num_heads, num_layers, d_ff, seq_lenght, dropout,in_d,tgt_vocab_size
