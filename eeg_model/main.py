@@ -72,7 +72,7 @@ class Transformer(nn.Module):
         self.optimizer = optim.AdamW(self.parameters(), lr=0.0001, betas=(0.9, 0.98), eps=1e-9)
         self.softmax = nn.Softmax(dim = 1)
         self.mask = torch.triu(torch.ones(seq_lenght,d_model*2), diagonal=1)
-        self.mask = self.mask.int().float()
+        self.mask = self.mask.int().float().cuda()
 
     def forward(self,src,tgt, valid = False):
         if valid:
@@ -101,7 +101,7 @@ class Transformer(nn.Module):
         data, test, lab = batch
         self.optimizer.zero_grad()
         output, _ = self.forward(data, test)
-        f_output = output.view(-1, 4)
+        f_output = output.view(-1, TGT_VOCAB_SIZE)
         loss = self.loss(f_output,lab)
         loss.backward()
         self.optimizer.step()
@@ -111,7 +111,7 @@ class Transformer(nn.Module):
     def valid_step(self,batch):
         data,y,true_pred = batch
         output, embeddings = self.forward(data, y, valid = True)
-        f_output = output.view(-1,4)
+        f_output = output.view(-1,TGT_VOCAB_SIZE)
         loss = self.loss(f_output, true_pred)
         correct = self.accuracy(f_output, true_pred)
         return [loss,correct,embeddings]
@@ -127,6 +127,7 @@ def labels_to_matrices(labels, tgt_vocab_size, seq_len):
         labels_matrices[i][labels[i]-1] = 1.0
         labels_matrices[i][tgt_vocab_size-1] = 0.0
     labels_matrices = labels_matrices.type(torch.FloatTensor).cuda()
+    print(labels_matrices.shape)
     return(labels_matrices)
 
 def slice_to_batches(raw_data, batch_size, n_batches, n_chans):
@@ -160,19 +161,13 @@ def preprocessing(dataset):
                     factor_new=factor_new, init_block_size=init_block_size)
     ]
 
-    preprocess(dataset, preprocessors, n_jobs=-1)
+    preprocess(dataset, preprocessors, n_jobs=1)
 
+    return dataset
 
-
-    splitted = dataset.split('session')
-    train_set = splitted['0train']
-    test_set = splitted['1test']
-    
-    return [train_set, test_set]
-
-train_datasets, target_datasets = preprocessing(MOABBDataset(dataset_name="BNCI2014_001", subject_ids=[1]))
-_,valid_datasets = preprocessing(MOABBDataset(dataset_name="BNCI2014_001", subject_ids=[4]))
-
+first_datasets = MOABBDataset(dataset_name="BNCI2014_001", subject_ids=[1,2,3,4,5,6,7,8,9])
+datasets = preprocessing(first_datasets)
+print(len(datasets.datasets))
 training_datasets = []
 test_datasets = []
 labels_batches = []
@@ -189,7 +184,7 @@ for i in range(len(valid_datasets.datasets)):
     for l in true_preds:
         pred_dict[l[0].item()] = l[2].item()
     pred_matrices = labels_to_matrices(pred_dict, TGT_VOCAB_SIZE, n_batches * SEQ_LEN)
-    pred_batches += torch.split(pred_matrices, SEQ_LEN).cuda()
+    pred_batches += torch.split(pred_matrices, SEQ_LEN)
 
 
 
@@ -205,7 +200,7 @@ for i in range(len(train_datasets.datasets)):
     for l in labels:
         labels_dict[l[0].item()] = l[2].item()
     labels_matrices = labels_to_matrices(labels_dict, TGT_VOCAB_SIZE, n_batches * SEQ_LEN)
-    labels_batches += torch.split(labels_matrices, SEQ_LEN).cuda()
+    labels_batches += torch.split(labels_matrices, SEQ_LEN)
     
     test_datasets += slice_to_batches(traw_data, SEQ_LEN, n_batches, N_CHANNELS)
 
@@ -243,7 +238,7 @@ valid_loss = 0
 last_loss = 0
 valid_corr = 0
 
-for  i in range(len(validating_datasets)):
+for i in range(len(validating_datasets)):
     loss,corr,embeddings = transformer.valid_step([validating_datasets[i],embeddings, pred_batches[i]])
     valid_loss += loss.item()
     valid_corr += corr
