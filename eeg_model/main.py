@@ -76,15 +76,15 @@ class Transformer(nn.Module):
 
     def forward(self,src,tgt, valid = False):
         if valid:
-            tgt_embedded = tgt
+            tgt_embedded = tgt.cuda()
         else:
-            tgt_embedded = self.dropout(self.positional_encoding(self.decoder_embedding(tgt.transpose(0,1))))
+            tgt_embedded = self.dropout(self.positional_encoding(self.decoder_embedding(tgt.transpose(0,1)))).cuda()
             tgt_embedded = tgt_embedded * self.mask
-        src_embedded = self.dropout(self.positional_encoding(self.encoder_embedding(src.transpose(0,1))))
-        enc_output = self.encoder.forward(src_embedded)
-        dec_output = self.decoder.forward(tgt_embedded, enc_output)
-        fc_output = self.fc(dec_output)
-        output = self.softmax(fc_output)
+        src_embedded = self.dropout(self.positional_encoding(self.encoder_embedding(src.transpose(0,1)))).cuda()
+        enc_output = self.encoder.forward(src_embedded).cuda()
+        dec_output = self.decoder.forward(tgt_embedded, enc_output).cuda()
+        fc_output = self.fc(dec_output).cuda()
+        output = self.softmax(fc_output).cuda()
         return [output, src_embedded]
 
     def accuracy(self, output, labels):
@@ -122,12 +122,10 @@ def labels_to_matrices(labels, tgt_vocab_size, seq_len):
     last_class = torch.ones(seq_len, 1).cuda()
     labels_matrices = torch.cat([class_matrices, last_class],1).cuda()
     coordinates = list(labels.keys())
-
     for i in coordinates:
         labels_matrices[i][labels[i]-1] = 1.0
         labels_matrices[i][tgt_vocab_size-1] = 0.0
     labels_matrices = labels_matrices.type(torch.FloatTensor).cuda()
-    print(labels_matrices.shape)
     return(labels_matrices)
 
 def slice_to_batches(raw_data, batch_size, n_batches, n_chans):
@@ -136,7 +134,7 @@ def slice_to_batches(raw_data, batch_size, n_batches, n_chans):
     single_batch = []
     for i in range(n_chans):
       element = raw_data[i][(b*batch_size):((b+1)*batch_size)]
-      element = element.unsqueeze(0)
+      element = element.unsqueeze(0).cuda()
       single_batch.append(element)
     tensored = torch.cat(single_batch,0).type(torch.FloatTensor).cuda()
     batch_list.append(tensored)
@@ -186,6 +184,7 @@ pred_batches = []
 for i in range(len(validating_set)):
     valid_raw = validating_set[i].raw
     raw_data = torch.from_numpy(valid_raw.get_data()).cuda()
+    print(raw_data.shape)
     n_batches = raw_data.size(1)//SEQ_LEN
     validating_datasets += slice_to_batches(raw_data, SEQ_LEN, n_batches, N_CHANNELS)
     true_preds = torch.from_numpy(mne.events_from_annotations(valid_raw)[0]).cuda()
@@ -194,7 +193,6 @@ for i in range(len(validating_set)):
         pred_dict[l[0].item()] = l[2].item()
     pred_matrices = labels_to_matrices(pred_dict, TGT_VOCAB_SIZE, n_batches * SEQ_LEN)
     pred_batches += torch.split(pred_matrices, SEQ_LEN)
-
 
 for i in range(len(training_datasets)):
     train_raw = training_set[i].raw
@@ -220,7 +218,7 @@ torch.save(transformer, "model.onnx")
 running_loss = 0
 last_loss = 0
 running_corr = 0
-EPOCHS = 39
+EPOCHS = 1
 output = 0
 start_time = time.time()
 best_loss = float('inf')
