@@ -58,7 +58,7 @@ class Transformer(nn.Module):
         self.in_d = in_d
         self.seq_lenght = seq_lenght
         self.encoder_embedding = nn.Linear(in_d,d_model)#!
-        self.decoder_embedding = nn.Linear(in_d,d_model)#!
+        self.decoder_embedding = nn.Linear(tgt_vocab_size,d_model)#!
         self.positional_encoding = PositionalEncoding(seq_lenght, d_model)
         self.encoder_layer = nn.TransformerEncoderLayer(d_model*2, num_heads, d_ff, dropout)
         self.decoder_layer = nn.TransformerDecoderLayer(d_model*2, num_heads, d_ff, dropout)
@@ -77,8 +77,9 @@ class Transformer(nn.Module):
         if valid:
             tgt_embedded = tgt.to(device)
         else:
-            tgt_embedded = self.dropout(self.positional_encoding(self.decoder_embedding(tgt.transpose(0,1)))).to(device)
+            tgt_embedded = self.dropout(self.positional_encoding(self.decoder_embedding(tgt))).to(device)
             tgt_embedded = tgt_embedded * self.mask
+        
         src_embedded = self.dropout(self.positional_encoding(self.encoder_embedding(src.transpose(0,1)))).to(device)
         enc_output = self.encoder.forward(src_embedded).to(device)
         dec_output = self.decoder.forward(tgt_embedded, enc_output).to(device)
@@ -97,9 +98,9 @@ class Transformer(nn.Module):
         return correct
 
     def training_step(self, batch):
-        data, test, lab = batch
+        data, lab = batch
         self.optimizer.zero_grad()
-        output, _ = self.forward(data, test)
+        output, _ = self.forward(data, lab)
         f_output = output.view(-1, TGT_VOCAB_SIZE)
         loss = self.loss(f_output,lab)
         loss.backward()
@@ -165,17 +166,14 @@ def preprocessing(dataset):
 one_train_set = 4
 
 training_set = []
-target_set = []
 validating_set = []
 for id in range(1,10):
     raw_dataset = MOABBDataset(dataset_name="BNCI2014_001", subject_ids=[id])
     preprocessed_dataset = preprocessing(raw_dataset)
-    training_set += preprocessed_dataset.datasets[0:4]
-    target_set += preprocessed_dataset.datasets[4:8]
+    training_set += preprocessed_dataset.datasets[0:8]
     validating_set += preprocessed_dataset.datasets[8:12]
 
 training_datasets = []
-test_datasets = []
 labels_batches = []
 validating_datasets = []
 pred_batches = []
@@ -197,15 +195,12 @@ for i in range(len(training_set)):
     raw_data = torch.from_numpy(train_raw.get_data()).to(device)
     n_batches = raw_data.size(1)//SEQ_LEN
     training_datasets += slice_to_batches(raw_data, SEQ_LEN, n_batches, N_CHANNELS)
-    test_raw = target_set[i].raw
-    traw_data = torch.from_numpy(test_raw.get_data()).to(device)
-    labels = torch.from_numpy(mne.events_from_annotations(test_raw)[0]).to(device)
+    labels = torch.from_numpy(mne.events_from_annotations(train_raw)[0]).to(device)
     labels_dict = {}
     for l in labels:
         labels_dict[l[0].item()] = l[2].item()
     labels_matrices = labels_to_matrices(labels_dict, TGT_VOCAB_SIZE, n_batches * SEQ_LEN)
     labels_batches += torch.split(labels_matrices, SEQ_LEN)
-    test_datasets += slice_to_batches(traw_data, SEQ_LEN, n_batches, N_CHANNELS)
 
 
 transformer = Transformer(DIM,NUM_HEADS,NUM_LAYERS,FF_DIM,SEQ_LEN,DROPOUT,N_CHANNELS,TGT_VOCAB_SIZE)#d_model, num_heads, num_layers, d_ff, seq_lenght, dropout,in_d,tgt_vocab_size
@@ -218,10 +213,11 @@ EPOCHS = 1
 output = 0
 start_time = time.time()
 best_loss = 9999999999999999.9
+print(len(training_datasets))
 for j in range(EPOCHS):
     for i in range(len(training_datasets)):
         transformer.train()
-        loss, corr = transformer.training_step([training_datasets[i],test_datasets[i],labels_batches[i]])
+        loss, corr = transformer.training_step([training_datasets[i],labels_batches[i]])
         running_loss += loss.item()
         running_corr += corr
         if loss < best_loss:
