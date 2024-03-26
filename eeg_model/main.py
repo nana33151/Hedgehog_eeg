@@ -87,17 +87,19 @@ class Transformer(nn.Module):
         output = self.softmax(fc_output).to(device)
         return [output, src_embedded]
 
-    def accuracy(self, output, labels):
+    def weightedAccuracy(self, output, labels,gistogram):
         correct = 0
         all_points = output.size(0)
+        pred = torch.argmax(output,dim = 1) #[tensor of indices]
+        true_pred = torch.argmax(labels, dim = 1)
+        sum = 0  #[tensor of indices]
         for i in range(all_points):
-            pred = torch.argmax(output[i]).item()
-            true_pred = torch.argmax(labels[i]).item()
-            if pred == true_pred:
-                correct += 1
-        return correct
+            if pred[i] == true_pred[i]:
+                correct += 1/gistogram[pred[i]]
+            sum += 1/gistogram[true_pred[i]]    
+        return correct/sum
 
-    def training_step(self, batch):
+    def training_step(self, batch,gistogram):
         data, lab = batch
         self.optimizer.zero_grad()
         output, _ = self.forward(data, lab)
@@ -105,28 +107,31 @@ class Transformer(nn.Module):
         loss = self.loss(f_output,lab)
         loss.backward()
         self.optimizer.step()
-        correct = self.accuracy(f_output,lab)
-        return [loss, correct]
+        accuracy = self.weightedAccuracy(f_output,lab,gistogram)
+        return [loss, accuracy]
 
-    def valid_step(self,batch):
+    def valid_step(self,batch,gistogram):
         data,y,true_pred = batch
         output, embeddings = self.forward(data, y, valid = True)
         f_output = output.view(-1,TGT_VOCAB_SIZE)
         loss = self.loss(f_output, true_pred)
-        correct = self.accuracy(f_output, true_pred)
-        return [loss,correct,embeddings]
+        accuracy = self.weightedAccuracy(f_output, true_pred,gistogram)
+        return [loss, accuracy,embeddings]
 
 
 def labels_to_matrices(labels, tgt_vocab_size, seq_len):
+    local_gistogram = [0,0,0,0,0]
     class_matrices = torch.zeros(seq_len, tgt_vocab_size-1).to(device)
     last_class = torch.ones(seq_len, 1).to(device)
     labels_matrices = torch.cat([class_matrices, last_class],1).to(device)
     coordinates = list(labels.keys())
     for i in coordinates:
         labels_matrices[i][labels[i]-1] = 1.0
+        local_gistogram[labels[i]-1] += 1
         labels_matrices[i][tgt_vocab_size-1] = 0.0
+    local_gistogram[4] = seq_len - len(coordinates)
     labels_matrices = labels_matrices.type(torch.FloatTensor).to(device)
-    return(labels_matrices)
+    return [labels_matrices, local_gistogram]
 
 def slice_to_batches(raw_data, batch_size, n_batches, n_chans):
   batch_list = []
@@ -163,6 +168,7 @@ def preprocessing(dataset):
 
     return dataset
 
+
 one_train_set = 4
 
 training_set = []
@@ -177,6 +183,7 @@ training_datasets = []
 labels_batches = []
 validating_datasets = []
 pred_batches = []
+gistogram = [0,0,0,0,0]
 
 for i in range(len(validating_set)):
     valid_raw = validating_set[i].raw
@@ -187,7 +194,9 @@ for i in range(len(validating_set)):
     pred_dict = {}
     for l in true_preds:
         pred_dict[l[0].item()] = l[2].item()
-    pred_matrices = labels_to_matrices(pred_dict, TGT_VOCAB_SIZE, n_batches * SEQ_LEN)
+    pred_matrices,valid_gistogram = labels_to_matrices(pred_dict, TGT_VOCAB_SIZE, n_batches * SEQ_LEN)
+    for j in range(TGT_VOCAB_SIZE):
+        gistogram[j] += valid_gistogram[j]
     pred_batches += torch.split(pred_matrices, SEQ_LEN)
 
 for i in range(len(training_set)):
@@ -199,9 +208,12 @@ for i in range(len(training_set)):
     labels_dict = {}
     for l in labels:
         labels_dict[l[0].item()] = l[2].item()
-    labels_matrices = labels_to_matrices(labels_dict, TGT_VOCAB_SIZE, n_batches * SEQ_LEN)
+    labels_matrices,training_gistogram = labels_to_matrices(labels_dict, TGT_VOCAB_SIZE, n_batches * SEQ_LEN)
+    for j in range(TGT_VOCAB_SIZE):
+        gistogram[j] += training_gistogram[j]
     labels_batches += torch.split(labels_matrices, SEQ_LEN)
 
+print(gistogram)
 
 transformer = Transformer(DIM,NUM_HEADS,NUM_LAYERS,FF_DIM,SEQ_LEN,DROPOUT,N_CHANNELS,TGT_VOCAB_SIZE)#d_model, num_heads, num_layers, d_ff, seq_lenght, dropout,in_d,tgt_vocab_size
 transformer = transformer.to(device)
@@ -215,9 +227,10 @@ start_time = time.time()
 best_loss = 9999999999999999.9
 print(len(training_datasets))
 for j in range(EPOCHS):
+    running_corr = 0
     for i in range(len(training_datasets)):
         transformer.train()
-        loss, corr = transformer.training_step([training_datasets[i],labels_batches[i]])
+        loss, corr = transformer.training_step([training_datasets[i],labels_batches[i]], gistogram)
         running_loss += loss.item()
         running_corr += corr
         if loss < best_loss:
@@ -226,7 +239,8 @@ for j in range(EPOCHS):
             torch.save(transformer, "model.onnx")
         if i % 10 == 9:
             last_loss = running_loss / 10 
-            print(f"batch {i+1} loss: {last_loss} correct {running_corr/10000}")
+            print("training step")
+            print(f"batch {i+1} loss: {last_loss} correct {running_corr/10}")
             running_loss = 0
             running_corr = 0
 
@@ -236,11 +250,31 @@ last_loss = 0
 valid_corr = 0
 
 for i in range(len(validating_datasets)):
-    loss,corr,embeddings = transformer.valid_step([validating_datasets[i],embeddings, pred_batches[i]])
+    loss,corr,embeddings = transformer.valid_step([validating_datasets[i],embeddings, pred_batches[i]],gistogram)
     valid_loss += loss.item()
     valid_corr += corr
     if i % 10 == 9:
         last_loss = running_loss / 10 
-        print(f"batch {i+1} loss: {valid_loss} correct {valid_corr/10000}")
+        print("validating step")
+        print(f"batch {i+1} loss: {valid_loss} correct {valid_corr/10}")
         valid_loss = 0
         valid_corr = 0
+"""
+list gistogram = {0, 0, 0, 0, 0}
+
+for dataset in data:
+    for batche in dataset:
+        for label in batch:
+            gistogram[label] += 1
+
+def weightedAccuracy(bla bla bla)):
+    sum = 0
+    acc = 0
+
+    bla bla bla argmax
+    for i in range (count_elements):
+        sum += 1/gistogram[labels[i]]
+        if (labels[i] == out[i]):
+            acc += 1/gistogram[labels[i]]
+        
+    return acc/sum"""
