@@ -32,6 +32,19 @@ DROPOUT = 0.5
 N_CHANNELS = 22
 SEQ_LEN = 1000
 device = "cuda" if torch.cuda.is_available() else "cpu"
+
+def weighted_loss(pred, lab):
+    loss = 0.
+    all_points = pred.size(0)
+    true_preds = torch.argmax(lab, dim = 1)
+    sum = 0.
+    for i in range(all_points):
+        loss += (1-pred[i][true_preds[i]])/gistogram[true_preds[i]]
+        sum += 1/gistogram[true_preds[i]]
+    return loss/sum
+    
+
+
 class PositionalEncoding(nn.Module):
     def __init__(self, seq_length, model_dim):
         super(PositionalEncoding,self).__init__()
@@ -67,7 +80,6 @@ class Transformer(nn.Module):
         self.encoder = nn.TransformerEncoder(self.encoder_layer, num_layers)
         self.decoder = nn.TransformerDecoder(self.decoder_layer, num_layers)
         self.fc = nn.Linear(d_model*2, tgt_vocab_size)
-        self.loss = nn.CrossEntropyLoss()
         self.optimizer = optim.AdamW(self.parameters(), lr=0.0001, betas=(0.9, 0.98), eps=1e-9)
         self.softmax = nn.Softmax(dim = 1)
         self.mask = torch.triu(torch.ones(seq_lenght,d_model*2), diagonal=1)
@@ -105,10 +117,7 @@ class Transformer(nn.Module):
         self.optimizer.zero_grad()
         output, _ = self.forward(data, lab)
         f_output = output.view(-1, TGT_VOCAB_SIZE)
-        gistogram_tensor = torch.tensor(gistogram)
-        weighted_output = torch.div(f_output, gistogram_tensor).to(device)
-        weighted_labels = torch.div(lab, gistogram_tensor).to(device)
-        loss = self.loss(weighted_output, weighted_labels)
+        loss = weighted_loss(f_output, lab)
         loss.backward(loss)
         self.optimizer.step()
         accuracy = self.weightedAccuracy(f_output,lab)
@@ -118,7 +127,7 @@ class Transformer(nn.Module):
         data,y,true_pred = batch
         output, embeddings = self.forward(data, y, valid = True)
         f_output = output.view(-1,TGT_VOCAB_SIZE)
-        loss = self.loss(f_output, true_pred)
+        loss = weighted_loss(f_output, true_pred)
         accuracy = self.weightedAccuracy(f_output, true_pred)
         return [loss, accuracy,embeddings]
 
@@ -172,9 +181,6 @@ def preprocessing(dataset):
 
     return dataset
 
-
-one_train_set = 4
-
 training_set = []
 validating_set = []
 for id in range(1,10):
@@ -217,7 +223,13 @@ for i in range(len(training_set)):
         gistogram[j] += training_gistogram[j]
     labels_batches += torch.split(labels_matrices, SEQ_LEN)
 
-print(gistogram)
+gistogram_tensor = torch.tensor(gistogram).to(device)
+norm_cf = 0.
+normalized_list = []
+for i in gistogram:
+    norm_cf += 1/i
+for i in gistogram:
+    normalized_list.append((1/i)/norm_cf)
 
 transformer = Transformer(DIM,NUM_HEADS,NUM_LAYERS,FF_DIM,SEQ_LEN,N_CHANNELS,TGT_VOCAB_SIZE)#d_model, num_heads, num_layers, d_ff, seq_lenght, dropout,in_d,tgt_vocab_size
 transformer = transformer.to(device)
@@ -225,29 +237,37 @@ torch.save(transformer, "model.onnx")
 running_loss = 0
 last_loss = 0
 running_acc = 0
-EPOCHS = 1
+EPOCHS = 2000
 output = 0
 start_time = time.time()
 best_loss = 9999999999999999.9
+epoch_loss = 0.
+epoch_accuracy = 0.
 print(len(training_datasets))
 for j in range(EPOCHS):
-    running_corr = 0
+    running_acc = 0
     for i in range(len(training_datasets)):
         transformer.train()
         loss, acc = transformer.training_step([training_datasets[i],labels_batches[i]])
         running_loss += loss.item()
         running_acc += acc
+        epoch_loss += loss.item()
+        epoch_accuracy += acc
         if loss < best_loss:
             best_loss = loss
             os.remove("model.onnx")
             torch.save(transformer, "model.onnx")
-        if i % 10 == 9:
-            last_loss = running_loss / 10 
+        if i % 1000 == 999:
+            last_loss = running_loss / 1000 
             print("training step")
-            print(f"batch {i+1} median loss: {last_loss}, meidan accuracy: {running_acc/10}")
+            print(f"batch {i+1} median loss: {last_loss}, meidan accuracy: {running_acc/1000}")
             running_loss = 0
             running_acc = 0
-
+    with open("results.txt") as file:
+        file.write(f"{epoch_loss/len(training_datasets)} {epoch_accuracy/len(training_datasets)}")
+    print(f"Epoch {j} loss {epoch_loss/len(training_datasets)}  accuracy {epoch_accuracy/len(training_datasets)}")
+    epoch_accuracy = 0
+    epoch_loss = 0
 embeddings = torch.randn(SEQ_LEN,DIM*2)
 valid_loss = 0
 last_loss = 0
@@ -258,9 +278,9 @@ for i in range(len(validating_datasets)):
     valid_loss += loss.item()
     valid_acc += acc
     if i % 10 == 9:
-        last_loss = running_loss / 10 
+        last_loss = valid_loss / 10 
         print("validating step")
-        print(f"batch {i+1} median loss: {valid_loss}, median accuracy: {valid_acc/10}")
+        print(f"batch {i+1} median loss: {last_loss}, median accuracy: {valid_acc/10}")
         valid_loss = 0
         valid_acc = 0
 """
