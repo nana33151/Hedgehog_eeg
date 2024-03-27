@@ -263,7 +263,7 @@ for j in range(EPOCHS):
             print(f"batch {i+1} median loss: {last_loss}, meidan accuracy: {running_acc/1000}")
             running_loss = 0
             running_acc = 0
-    with open("results.txt") as file:
+    with open("results.txt", mode = "w") as file:
         file.write(f"{epoch_loss/len(training_datasets)} {epoch_accuracy/len(training_datasets)}")
     print(f"Epoch {j} loss {epoch_loss/len(training_datasets)}  accuracy {epoch_accuracy/len(training_datasets)}")
     epoch_accuracy = 0
