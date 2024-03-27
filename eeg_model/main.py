@@ -237,13 +237,13 @@ torch.save(transformer, "model.onnx")
 running_loss = 0
 last_loss = 0
 running_acc = 0
-EPOCHS = 2000
+EPOCHS = 1
 output = 0
 start_time = time.time()
 best_loss = 9999999999999999.9
 epoch_loss = 0.
 epoch_accuracy = 0.
-print(len(training_datasets))
+model = torch.load("model.onnx")
 for j in range(EPOCHS):
     running_acc = 0
     for i in range(len(training_datasets)):
@@ -260,11 +260,11 @@ for j in range(EPOCHS):
         if i % 1000 == 999:
             last_loss = running_loss / 1000 
             print("training step")
-            print(f"batch {i+1} median loss: {last_loss}, meidan accuracy: {running_acc/1000}")
+            print(f"batch {i+1} mean loss: {last_loss}, mean accuracy: {running_acc/1000}")
             running_loss = 0
             running_acc = 0
     with open("results.txt", mode = "w") as file:
-        file.write(f"{epoch_loss/len(training_datasets)} {epoch_accuracy/len(training_datasets)}")
+        file.write(f"{epoch_loss/len(training_datasets)} {epoch_accuracy/len(training_datasets)} {best_loss}")
     print(f"Epoch {j} loss {epoch_loss/len(training_datasets)}  accuracy {epoch_accuracy/len(training_datasets)}")
     epoch_accuracy = 0
     epoch_loss = 0
@@ -280,7 +280,7 @@ for i in range(len(validating_datasets)):
     if i % 10 == 9:
         last_loss = valid_loss / 10 
         print("validating step")
-        print(f"batch {i+1} median loss: {last_loss}, median accuracy: {valid_acc/10}")
+        print(f"batch {i+1} mean loss: {last_loss}, mean accuracy: {valid_acc/10}")
         valid_loss = 0
         valid_acc = 0
 """
