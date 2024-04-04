@@ -33,6 +33,10 @@ N_CHANNELS = 22
 SEQ_LEN = 1000
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
+print("-----------------------------------------------------------------")
+print(device)
+print("-----------------------------------------------------------------")
+
 def weighted_loss(pred, lab):
     loss = 0.
     all_points = pred.size(0)
