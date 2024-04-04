@@ -33,6 +33,10 @@ N_CHANNELS = 22
 SEQ_LEN = 1000
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
+print("-----------------------------------------------------------------")
+print(device)
+print("-----------------------------------------------------------------")
+
 def weighted_loss(pred, lab):
     loss = 0.
     all_points = pred.size(0)
@@ -74,13 +78,13 @@ class Transformer(nn.Module):
         self.encoder_embedding = nn.Linear(in_d,d_model)#!
         self.decoder_embedding = nn.Linear(tgt_vocab_size,d_model)#!
         self.positional_encoding = PositionalEncoding(seq_lenght, d_model)
-        self.encoder_layer = nn.TransformerEncoderLayer(d_model*2, num_heads, d_ff, dropout = 0., activation= "gelu")
-        self.decoder_layer = nn.TransformerDecoderLayer(d_model*2, num_heads, d_ff, dropout = 0., activation= "gelu")
+        self.encoder_layer = nn.TransformerEncoderLayer(d_model*2, num_heads, d_ff, activation= "gelu")
+        self.decoder_layer = nn.TransformerDecoderLayer(d_model*2, num_heads, d_ff, activation= "gelu")
 
         self.encoder = nn.TransformerEncoder(self.encoder_layer, num_layers)
         self.decoder = nn.TransformerDecoder(self.decoder_layer, num_layers)
         self.fc = nn.Linear(d_model*2, tgt_vocab_size)
-        self.optimizer = optim.AdamW(self.parameters(), lr=0.0001, betas=(0.9, 0.98), eps=1e-9)
+        self.optimizer = optim.AdamW(self.parameters(), lr=0.001, betas=(0.9, 0.98), eps=1e-9)
         self.softmax = nn.Softmax(dim = 1)
         self.mask = torch.triu(torch.ones(seq_lenght,d_model*2), diagonal=1)
         self.mask = self.mask.int().float().to(device)
@@ -237,7 +241,7 @@ torch.save(transformer, "model.onnx")
 running_loss = 0
 last_loss = 0
 running_acc = 0
-EPOCHS = 1
+EPOCHS = 40
 output = 0
 start_time = time.time()
 best_loss = 9999999999999999.9
@@ -257,6 +261,7 @@ for j in range(EPOCHS):
             best_loss = loss
             os.remove("model.onnx")
             torch.save(transformer, "model.onnx")
+        
         if i % 1000 == 999:
             last_loss = running_loss / 1000 
             print("training step")
