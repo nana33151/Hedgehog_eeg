@@ -31,7 +31,7 @@ FF_DIM = 64
 DROPOUT = 0.5
 N_CHANNELS = 22
 SEQ_LEN = 1000
-DUR = int(1.25 * 250)
+DURATION = 1.25 * 250
 input_lag = int(0.3 * 250)
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -254,7 +254,7 @@ model = torch.load("model.onnx")
 loss_list = []
 with open("loss.txt", "w+") as file2:
     loss_list = map(float,file2.read().split())
-    best_loss = max(best_loss,max(loss_list))
+    best_loss = min(best_loss,min(loss_list))
 for j in range(EPOCHS):
     running_acc = 0
     for i in range(len(training_datasets)):
