@@ -31,7 +31,7 @@ FF_DIM = 64
 DROPOUT = 0.5
 N_CHANNELS = 22
 SEQ_LEN = 1000
-DUR = 1.25 * 250
+DUR = int(1.25 * 250)
 input_lag = int(0.3 * 250)
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -267,7 +267,7 @@ for j in range(EPOCHS):
         if loss < best_loss:
             best_loss = loss.item()
             with open("loss.txt", "a") as file2:
-                file2.write(str(best_loss))
+                file2.write((" " + str(best_loss)))
             os.remove("model.onnx")
             torch.save(transformer, "model.onnx")
         if i % 1000 == 999:
