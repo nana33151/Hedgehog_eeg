@@ -265,7 +265,7 @@ for j in range(EPOCHS):
         epoch_loss += loss.item()
         epoch_accuracy += acc
         if loss < best_loss:
-            best_loss = loss
+            best_loss = loss.item()
             with open("loss.txt", "a") as file2:
                 file2.write(str(best_loss))
             os.remove("model.onnx")
