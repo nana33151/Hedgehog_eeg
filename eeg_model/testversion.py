@@ -31,7 +31,7 @@ FF_DIM = 64
 DROPOUT = 0.5
 N_CHANNELS = 22
 SEQ_LEN = 1000
-DURATION = 1.25 * 250
+DUR = 1.25 * 250
 input_lag = int(0.3 * 250)
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
