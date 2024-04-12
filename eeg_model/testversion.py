@@ -265,7 +265,6 @@ for j in range(EPOCHS):
             best_loss = loss.item()
             with open("loss.txt", "a") as file2:
                 file2.write((" " + str(best_loss)))
-            os.remove("model.onnx")
             torch.save(transformer, "model.onnx")
         last_loss = epoch_loss / len(training_datasets)
     print("training step")
