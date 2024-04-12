@@ -261,14 +261,14 @@ for j in range(EPOCHS):
         loss, acc = transformer.training_step([training_datasets[i],labels_batches[i]])
         epoch_loss += loss.item()
         epoch_accuracy += acc
-        if loss < best_loss:
-            best_loss = loss.item()
-            with open("loss.txt", "a") as file2:
-                file2.write((" " + str(best_loss)))
-            torch.save(transformer, "model.onnx")
-        last_loss = epoch_loss / len(training_datasets)
+    last_loss = epoch_loss / len(training_datasets)
     print("training step")
     print(f"epoch {j+1} mean loss: {last_loss}, mean accuracy: {epoch_accuracy/len(training_datasets)}")
+    if last_loss < best_loss:
+        best_loss = last_loss
+        with open("loss.txt", "a") as file2:
+            file2.write((" " + str(best_loss)))
+            torch.save(transformer, "model.onnx")
     with open("results.txt", "a") as file1:
         file1.write(f"{epoch_loss/len(training_datasets)} {epoch_accuracy/len(training_datasets)}")
     epoch_accuracy = 0
