@@ -240,7 +240,6 @@ print(gistogram)
 print(labels_matrices)
 transformer = Transformer(DIM,NUM_HEADS,NUM_LAYERS,FF_DIM,SEQ_LEN,N_CHANNELS,TGT_VOCAB_SIZE)#d_model, num_heads, num_layers, d_ff, seq_lenght, dropout,in_d,tgt_vocab_size
 transformer = transformer.to(device)
-torch.save(transformer, "model.onnx")
 running_loss = 0
 last_loss = 0
 running_acc = 0
@@ -260,8 +259,6 @@ for j in range(EPOCHS):
     for i in range(len(training_datasets)):
         transformer.train()
         loss, acc = transformer.training_step([training_datasets[i],labels_batches[i]])
-        running_loss += loss.item()
-        running_acc += acc
         epoch_loss += loss.item()
         epoch_accuracy += acc
         if loss < best_loss:
@@ -270,15 +267,11 @@ for j in range(EPOCHS):
                 file2.write((" " + str(best_loss)))
             os.remove("model.onnx")
             torch.save(transformer, "model.onnx")
-        if i % 1000 == 999:
-            last_loss = running_loss / 1000 
-            print("training step")
-            print(f"batch {i+1} mean loss: {last_loss}, mean accuracy: {running_acc/1000}")
-            running_loss = 0
-            running_acc = 0
+        last_loss = epoch_loss / len(training_datasets)
+    print("training step")
+    print(f"epoch {j+1} mean loss: {last_loss}, mean accuracy: {epoch_accuracy/len(training_datasets)}")
     with open("results.txt", "a") as file1:
         file1.write(f"{epoch_loss/len(training_datasets)} {epoch_accuracy/len(training_datasets)}")
-    print(f"Epoch {j} loss {epoch_loss/len(training_datasets)}  accuracy {epoch_accuracy/len(training_datasets)}")
     epoch_accuracy = 0
     epoch_loss = 0
 embeddings = torch.randn(SEQ_LEN,DIM*2)
@@ -297,8 +290,8 @@ for i in range(len(validating_datasets)):
         valid_loss = 0
         valid_acc = 0
 
-
 """
+
 list gistogram = {0, 0, 0, 0, 0}
 
 for dataset in data:
@@ -316,4 +309,5 @@ def weightedAccuracy(bla bla bla)):
         if (labels[i] == out[i]):
             acc += 1/gistogram[labels[i]]
         
-    return acc/sum"""
+    return acc/sum
+    """
