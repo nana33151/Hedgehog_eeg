@@ -113,6 +113,7 @@ class Transformer(nn.Module):
         sum = 0  #[tensor of indices]
         for i in range(all_points):
             if pred[i] == true_pred[i]:
+                #print(gistogram, pred[i])
                 correct += 1/gistogram[pred[i]]
             sum += 1/gistogram[true_pred[i]]    
         return correct/sum
@@ -236,6 +237,7 @@ for i in gistogram:
     norm_cf += 1/i
 for i in gistogram:
     normalized_list.append((1/i)/norm_cf)
+print("gistogram")
 print(gistogram)
 print(labels_matrices)
 transformer = Transformer(DIM,NUM_HEADS,NUM_LAYERS,FF_DIM,SEQ_LEN,N_CHANNELS,TGT_VOCAB_SIZE)#d_model, num_heads, num_layers, d_ff, seq_lenght, dropout,in_d,tgt_vocab_size
@@ -243,7 +245,7 @@ transformer = transformer.to(device)
 running_loss = 0
 last_loss = 0
 running_acc = 0
-EPOCHS = 1
+EPOCHS = 150
 output = 0
 start_time = time.time()
 best_loss = 9999999999999999.9
@@ -308,5 +310,5 @@ def weightedAccuracy(bla bla bla)):
         if (labels[i] == out[i]):
             acc += 1/gistogram[labels[i]]
         
-    return acc/sum
+    return accsum
     """
