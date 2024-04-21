@@ -189,7 +189,7 @@ def preprocessing(dataset):
 
 training_set = []
 validating_set = []
-for id in range(1,10):
+for id in range(1,2):
     raw_dataset = MOABBDataset(dataset_name="BNCI2014_001", subject_ids=[id])
     preprocessed_dataset = preprocessing(raw_dataset)
     training_set += preprocessed_dataset.datasets[0:8]
@@ -205,7 +205,7 @@ for i in range(len(validating_set)):
     valid_raw = validating_set[i].raw
     raw_data = torch.from_numpy(valid_raw.get_data()).to(device)
     n_batches = raw_data.size(1)//SEQ_LEN
-    validating_datasets += slice_to_batches(raw_data, SEQ_LEN, n_batches, N_CHANNELS)
+    validating_datasets += slice_to_batches(raw_data, SEQ_LEN, 5, N_CHANNELS)
     true_preds = torch.from_numpy(mne.events_from_annotations(valid_raw)[0]).to(device)
     pred_dict = {}
     for l in true_preds:
@@ -219,7 +219,7 @@ for i in range(len(training_set)):
     train_raw = training_set[i].raw
     raw_data = torch.from_numpy(train_raw.get_data()).to(device)
     n_batches = raw_data.size(1)//SEQ_LEN
-    training_datasets += slice_to_batches(raw_data, SEQ_LEN, n_batches, N_CHANNELS)
+    training_datasets += slice_to_batches(raw_data, SEQ_LEN, 5, N_CHANNELS)
     labels = torch.from_numpy(mne.events_from_annotations(train_raw)[0]).to(device)
     labels_dict = {}
     for l in labels:
@@ -240,20 +240,34 @@ print(gistogram)
 print(labels_matrices)
 transformer = Transformer(DIM,NUM_HEADS,NUM_LAYERS,FF_DIM,SEQ_LEN,N_CHANNELS,TGT_VOCAB_SIZE)#d_model, num_heads, num_layers, d_ff, seq_lenght, dropout,in_d,tgt_vocab_size
 transformer = transformer.to(device)
+print("-----------------------------------------------------------------------------------------------------------------------------", transformer.state_dict())
 running_loss = 0
 last_loss = 0
 running_acc = 0
-EPOCHS = 1
+EPOCHS = 2
 output = 0
 start_time = time.time()
-best_loss = 9999999999999999.9
 epoch_loss = 0.
 epoch_accuracy = 0.
-model = torch.load("model.onnx")
 loss_list = []
-with open("loss.txt", "r") as file2:
-    loss_list = map(float,file2.read().split())
-    best_loss = min(best_loss,min(loss_list))
+checkpoint = torch.load("C:/Users/User/Documents/GitHub/Hedgehog_eeg/eeg_model/checkpoint.pt")
+info_dict = {
+    'epoch':checkpoint['epoch'],
+    'model_state_dict':checkpoint['model_state_dict'],
+    'optimizer_state_dict':checkpoint['optimizer_state_dict'],
+    'loss': checkpoint['loss']
+}
+transformer.load_state_dict(checkpoint['model_state_dict'])
+transformer.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+epoch = checkpoint['epoch']
+#info_dict = {
+#    'epoch':"",
+#    'model_state_dict':"",
+#    'optimizer_state_dict':"",
+#    'loss': 999999.0
+#}
+print("-----------------------------------------------------------------------------------------------------------------------------")
+print(transformer.state_dict())
 for j in range(EPOCHS):
     running_acc = 0
     for i in range(len(training_datasets)):
@@ -263,14 +277,13 @@ for j in range(EPOCHS):
         epoch_accuracy += acc
     last_loss = epoch_loss / len(training_datasets)
     print("training step")
-    print(f"epoch {j+1} mean loss: {last_loss}, mean accuracy: {epoch_accuracy/len(training_datasets)}")
-    if last_loss < best_loss:
-        best_loss = last_loss
-        with open("loss.txt", "a") as file2:
-            file2.write((" " + str(best_loss)))
-            torch.save(transformer, "model.onnx")
-    with open("results.txt", "a") as file1:
-        file1.write(f"{epoch_loss/len(training_datasets)} {epoch_accuracy/len(training_datasets)}")
+    print(f"epoch {epoch + j+1} mean loss: {last_loss}, mean accuracy: {epoch_accuracy/len(training_datasets)}")
+    if last_loss < info_dict['loss']:
+        info_dict['epoch'] = epoch + j+1 
+        info_dict['model_state_dict'] = transformer.state_dict()
+        info_dict['optimizer_state_dict'] = transformer.optimizer.state_dict()
+        info_dict['loss'] = last_loss
+        torch.save(info_dict, "C:/Users/User/Documents/GitHub/Hedgehog_eeg/eeg_model/checkpoint.pt")
     epoch_accuracy = 0
     epoch_loss = 0
 embeddings = torch.randn(SEQ_LEN,DIM*2)
