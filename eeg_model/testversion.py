@@ -240,7 +240,7 @@ print(gistogram)
 print(labels_matrices)
 transformer = Transformer(DIM,NUM_HEADS,NUM_LAYERS,FF_DIM,SEQ_LEN,N_CHANNELS,TGT_VOCAB_SIZE)#d_model, num_heads, num_layers, d_ff, seq_lenght, dropout,in_d,tgt_vocab_size
 transformer = transformer.to(device)
-print("-----------------------------------------------------------------------------------------------------------------------------", transformer.state_dict())
+#print("-----------------------------------------------------------------------------------------------------------------------------", transformer.state_dict())
 running_loss = 0
 last_loss = 0
 running_acc = 0
@@ -250,7 +250,7 @@ start_time = time.time()
 epoch_loss = 0.
 epoch_accuracy = 0.
 loss_list = []
-checkpoint = torch.load("C:/Users/User/Documents/GitHub/Hedgehog_eeg/eeg_model/checkpoint.pt")
+checkpoint = torch.load("eeg_model/checkpoint.pt")
 info_dict = {
     'epoch':checkpoint['epoch'],
     'model_state_dict':checkpoint['model_state_dict'],
@@ -266,8 +266,8 @@ epoch = checkpoint['epoch']
 #    'optimizer_state_dict':"",
 #    'loss': 999999.0
 #}
-print("-----------------------------------------------------------------------------------------------------------------------------")
-print(transformer.state_dict())
+#print("-----------------------------------------------------------------------------------------------------------------------------")
+#print(transformer.state_dict())
 for j in range(EPOCHS):
     running_acc = 0
     for i in range(len(training_datasets)):

@@ -239,13 +239,13 @@ transformer = Transformer(DIM,NUM_HEADS,NUM_LAYERS,FF_DIM,SEQ_LEN,N_CHANNELS,TGT
 transformer = transformer.to(device)
 last_loss = 0
 running_acc = 0
-EPOCHS = 2
+EPOCHS = 3
 output = 0
 start_time = time.time()
 epoch_loss = 0.
 epoch_accuracy = 0.
 loss_list = []
-checkpoint = torch.load("C:/Users/User/Documents/GitHub/Hedgehog_eeg/eeg_model/checkpoint.pt")
+checkpoint = torch.load("eeg_model/checkpoint.pt")
 info_dict = {
     'epoch':checkpoint['epoch'],
     'model_state_dict':checkpoint['model_state_dict'],
@@ -272,7 +272,7 @@ for j in range(EPOCHS):
         info_dict['model_state_dict'] = transformer.state_dict()
         info_dict['optimizer_state_dict'] = transformer.optimizer.state_dict()
         info_dict['loss'] = last_loss
-        torch.save(info_dict, "C:/Users/User/Documents/GitHub/Hedgehog_eeg/eeg_model/checkpoint.pt")
+        torch.save(info_dict, "eeg_model/checkpoint.pt")
     epoch_accuracy = 0
     epoch_loss = 0
 embeddings = torch.randn(SEQ_LEN,DIM*2)
