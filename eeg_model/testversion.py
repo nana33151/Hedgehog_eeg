@@ -274,6 +274,7 @@ epoch = checkpoint['epoch']
 #print(transformer.state_dict())
 for j in range(EPOCHS):
     running_acc = 0
+    print(len(training_datasets))
     for i in range(len(training_datasets)):
         transformer.train()
         loss, acc = transformer.training_step([training_datasets[i],labels_batches[i]])
@@ -287,7 +288,7 @@ for j in range(EPOCHS):
         checkpoint['model_state_dict'] = transformer.state_dict()
         checkpoint['optimizer_state_dict'] = transformer.optimizer.state_dict()
         checkpoint['loss'] = last_loss
-        torch.save(checkpoint, "C:/Users/User/Documents/GitHub/Hedgehog_eeg/eeg_model/checkpoint.pt")
+        torch.save(checkpoint, "eeg_model/checkpoint.pt")
     epoch_accuracy = 0
     epoch_loss = 0
 embeddings = torch.randn(SEQ_LEN,DIM*2)
