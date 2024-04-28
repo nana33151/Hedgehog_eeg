@@ -189,7 +189,7 @@ def preprocessing(dataset):
 
 training_set = []
 validating_set = []
-for id in range(1,2):
+for id in range(1,10):
     raw_dataset = MOABBDataset(dataset_name="BNCI2014_001", subject_ids=[id])
     preprocessed_dataset = preprocessing(raw_dataset)
     training_set += preprocessed_dataset.datasets[0:8]
@@ -205,7 +205,7 @@ for i in range(len(validating_set)):
     valid_raw = validating_set[i].raw
     raw_data = torch.from_numpy(valid_raw.get_data()).to(device)
     n_batches = raw_data.size(1)//SEQ_LEN
-    validating_datasets += slice_to_batches(raw_data, SEQ_LEN, 5, N_CHANNELS)
+    validating_datasets += slice_to_batches(raw_data, SEQ_LEN, n_batches, N_CHANNELS)
     true_preds = torch.from_numpy(mne.events_from_annotations(valid_raw)[0]).to(device)
     pred_dict = {}
     for l in true_preds:
@@ -219,7 +219,7 @@ for i in range(len(training_set)):
     train_raw = training_set[i].raw
     raw_data = torch.from_numpy(train_raw.get_data()).to(device)
     n_batches = raw_data.size(1)//SEQ_LEN
-    training_datasets += slice_to_batches(raw_data, SEQ_LEN, 5, N_CHANNELS)
+    training_datasets += slice_to_batches(raw_data, SEQ_LEN, n_batches, N_CHANNELS)
     labels = torch.from_numpy(mne.events_from_annotations(train_raw)[0]).to(device)
     labels_dict = {}
     for l in labels:
