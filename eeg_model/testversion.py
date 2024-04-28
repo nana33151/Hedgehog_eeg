@@ -250,13 +250,17 @@ start_time = time.time()
 epoch_loss = 0.
 epoch_accuracy = 0.
 loss_list = []
-checkpoint = torch.load("eeg_model/checkpoint.pt")
-info_dict = {
-    'epoch':checkpoint['epoch'],
-    'model_state_dict':checkpoint['model_state_dict'],
-    'optimizer_state_dict':checkpoint['optimizer_state_dict'],
-    'loss': checkpoint['loss']
-}
+def_sd = transformer.state_dict()
+odef_sd = transformer.optimizer.state_dict()
+try:
+    checkpoint = torch.load("eeg_model/checkpoint.pt")
+except:
+    checkpoint = {'epoch':0,
+    'model_state_dict':def_sd,
+    'optimizer_state_dict':odef_sd,
+    'loss': 99999.0}
+
+
 transformer.load_state_dict(checkpoint['model_state_dict'])
 transformer.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 epoch = checkpoint['epoch']
@@ -278,12 +282,12 @@ for j in range(EPOCHS):
     last_loss = epoch_loss / len(training_datasets)
     print("training step")
     print(f"epoch {epoch + j+1} mean loss: {last_loss}, mean accuracy: {epoch_accuracy/len(training_datasets)}")
-    if last_loss < info_dict['loss']:
-        info_dict['epoch'] = epoch + j+1 
-        info_dict['model_state_dict'] = transformer.state_dict()
-        info_dict['optimizer_state_dict'] = transformer.optimizer.state_dict()
-        info_dict['loss'] = last_loss
-        torch.save(info_dict, "C:/Users/User/Documents/GitHub/Hedgehog_eeg/eeg_model/checkpoint.pt")
+    if last_loss < checkpoint['loss']:
+        checkpoint['epoch'] = epoch + j+1 
+        checkpoint['model_state_dict'] = transformer.state_dict()
+        checkpoint['optimizer_state_dict'] = transformer.optimizer.state_dict()
+        checkpoint['loss'] = last_loss
+        torch.save(checkpoint, "C:/Users/User/Documents/GitHub/Hedgehog_eeg/eeg_model/checkpoint.pt")
     epoch_accuracy = 0
     epoch_loss = 0
 embeddings = torch.randn(SEQ_LEN,DIM*2)
